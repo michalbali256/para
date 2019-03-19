@@ -32,22 +32,21 @@ public:
 		 */
 	}
 
+	template <bool update_assignments>
 	struct sum {
-
-		size_t k;
 		std::vector<POINT> point_sum;
-		std::vector<int_fast64_t> count;
+		std::vector<int_fast64_t> centroid_count;
 
-		sum() {}
-		sum(size_t k)
+		sum()
 		{
 			point_sum.resize(k);
-			count.resize(k);
+			centroid_count.resize(k);
 		}
 		sum(sum& s, tbb::split)
 		{
+			
 			point_sum.resize(k);
-			count.resize(k);
+			centroid_count.resize(k);
 		}
 
 		void operator()(const tbb::blocked_range<POINT*>& r) {
@@ -67,11 +66,24 @@ public:
 				}
 				point_sum[mi].x += a->x;
 				point_sum[mi].y += a->y;
+				centroid_count[mi]++;
+				if (update_assignments)
+				{
+
+				}
 
 			}
 			
 		}
-		void join(sum& rhs) { }
+		void join(sum& rhs)
+		{
+			for (int i = 0; i < k; ++i)
+			{
+				point_sum[i].x += rhs.point_sum[i].x;
+				point_sum[i].y += rhs.point_sum[i].y;
+				centroid_count[i] += rhs.centroid_count[i];
+			}
+		}
 	};
 
 
@@ -89,8 +101,12 @@ public:
 	virtual void compute(const std::vector<POINT> &points, std::size_t k, std::size_t iters,
 		std::vector<POINT> &centroids, std::vector<ASGN> &assignments)
 	{
-		sum s;
-		tbb::parallel_for(5, 6, [](int a) {});
+		for (size_t i = 0; i < iters; ++i)
+		{
+			sum<false> s;
+		}
+		
+		
 		/*
 			Your core goes here ...
 		*/
@@ -98,5 +114,7 @@ public:
 	}
 };
 
+template<typename POINT, typename ASGN, bool DEBUG>
+size_t KMeans<POINT, ASGN, DEBUG>::k;
 
 #endif
