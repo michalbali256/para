@@ -35,6 +35,7 @@ public:
 		 */
 	}
 
+	template <bool update_assignment>
 	struct sum {
 		std::vector<POINT> point_sum;
 		std::vector<int_fast64_t> centroid_count;
@@ -86,13 +87,15 @@ public:
 				point_sum[mi].x += a->x;
 				point_sum[mi].y += a->y;
 				centroid_count[mi]++;
-				assignments[a - points->data()] = (ASGN) mi;
+
+				if(update_assignment)
+					assignments[a - points->data()] = (ASGN) mi;
 			}
 			
 		}
 		void join(sum& rhs)
 		{
-			for (int i = 0; i < k; ++i)
+			for (size_t i = 0; i < k; ++i)
 			{
 				point_sum[i].x += rhs.point_sum[i].x;
 				point_sum[i].y += rhs.point_sum[i].y;
@@ -113,6 +116,22 @@ public:
 	 * \param assignments Vector where the final assignment of the points should be stored.
 	 *		The indices should correspond to point indices in 'points' vector.
 	 */
+	template <bool update_assignment>
+	void do_one_iter(const std::vector<POINT> &points, std::vector<POINT> &centroids)
+	{
+		sum<update_assignment> s;
+		tbb::blocked_range<const POINT *> whole(points.data(), points.data() + points.size());
+
+		tbb::parallel_reduce(whole, s);
+
+		for (std::size_t i = 0; i < k; ++i)
+		{
+			if (s.centroid_count[i] == 0) continue;	// If the cluster is empty, keep its previous centroid.
+			centroids[i].x = s.point_sum[i].x / (std::int64_t)s.centroid_count[i];
+			centroids[i].y = s.point_sum[i].y / (std::int64_t)s.centroid_count[i];
+		}
+	}
+
 	virtual void compute(const std::vector<POINT> &points, std::size_t k, std::size_t iters,
 		std::vector<POINT> &centroids, std::vector<ASGN> &assignments)
 	{
@@ -126,21 +145,11 @@ public:
 		KMeans::centroids = &centroids;
 		KMeans::k = k;
 
-		for (size_t i = 0; i < iters; ++i)
+		for (size_t i = 0; i < iters-1; ++i)
 		{
-			sum s;
-			tbb::blocked_range<const POINT *> whole(points.data(), points.data() + points.size());
-
-			tbb::parallel_reduce(whole, s);
-
-			for (std::size_t i = 0; i < k; ++i)
-			{
-				if (s.centroid_count[i] == 0) continue;	// If the cluster is empty, keep its previous centroid.
-				centroids[i].x = s.point_sum[i].x / (std::int64_t)s.centroid_count[i];
-				centroids[i].y = s.point_sum[i].y / (std::int64_t)s.centroid_count[i];
-			}
+			do_one_iter<false>(points, centroids);
 		}
-
+		do_one_iter<true>(points, centroids);
 		assignments = std::move(KMeans::assignments);
 
 	}
