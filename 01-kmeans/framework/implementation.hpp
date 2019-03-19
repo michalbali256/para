@@ -17,8 +17,8 @@ public:
 
 	static const std::vector<POINT> * points;
 	static size_t k;
-	std::vector<ASGN> * assignments;
-	std::vector<POINT> * centroids;
+	static std::vector<ASGN> * assignments;
+	static std::vector<POINT> * centroids;
 	/*
 	 * \brief Perform the initialization of the functor (e.g., allocate memory buffers).
 	 * \param points Number of points being clustered.
@@ -32,38 +32,46 @@ public:
 		 */
 	}
 
-	struct Sum {
+	struct sum {
 
 		size_t k;
-		std::vector<int_fast64_t> dist;
+		std::vector<POINT> point_sum;
 		std::vector<int_fast64_t> count;
 
-		Sum() {}
-		Sum(size_t k)
+		sum() {}
+		sum(size_t k)
 		{
-			dist.resize(k);
+			point_sum.resize(k);
 			count.resize(k);
 		}
-		Sum(Sum& s, tbb::split)
+		sum(sum& s, tbb::split)
 		{
-			dist.resize(k);
+			point_sum.resize(k);
 			count.resize(k);
 		}
 
 		void operator()(const tbb::blocked_range<POINT*>& r) {
-			float temp = value;
+			
 			for (POINT* a = r.begin(); a != r.end(); ++a)
 			{
 				float m;
-
+				size_t mi;
 				for (size_t i = 0; i < k; ++i)
 				{
-					float dist = sqrt((a->x))
+					float dist = sqrt((a->x - (*centroids)[i].x) * (a->x - (*centroids)[i].x) + (a->y - (*centroids)[i].y) * (a->y - (*centroids)[i].y));
+					if (dist < m)
+					{
+						mi = i;
+						m = dist;
+					}
 				}
+				point_sum[mi].x += a->x;
+				point_sum[mi].y += a->y;
+
 			}
-			value = temp;
+			
 		}
-		void join(Sum& rhs) { value += rhs.value; }
+		void join(sum& rhs) { }
 	};
 
 
@@ -81,7 +89,7 @@ public:
 	virtual void compute(const std::vector<POINT> &points, std::size_t k, std::size_t iters,
 		std::vector<POINT> &centroids, std::vector<ASGN> &assignments)
 	{
-		Sum s;
+		sum s;
 		tbb::parallel_for(5, 6, [](int a) {});
 		/*
 			Your core goes here ...
