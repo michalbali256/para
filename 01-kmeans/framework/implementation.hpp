@@ -135,8 +135,6 @@ public:
 	virtual void compute(const std::vector<POINT> &points, std::size_t k, std::size_t iters,
 		std::vector<POINT> &centroids, std::vector<ASGN> &assignments)
 	{
-		
-		
 		centroids.resize(k);
 		for (std::size_t i = 0; i < k; ++i)
 			centroids[i] = points[i];
@@ -150,8 +148,8 @@ public:
 			do_one_iter<false>(points, centroids);
 		}
 		do_one_iter<true>(points, centroids);
+		
 		assignments = std::move(KMeans::assignments);
-
 	}
 };
 
