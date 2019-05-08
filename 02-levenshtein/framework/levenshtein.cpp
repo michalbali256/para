@@ -5,9 +5,9 @@
  */
 #include <implementation.hpp>
 
-#include <exception.hpp>
-#include <stopwatch.hpp>
-#include <interface.hpp>
+#include <internal/exception.hpp>
+#include <internal/stopwatch.hpp>
+#include <internal/interface.hpp>
 
 #include <vector>
 #include <iostream>
@@ -120,6 +120,8 @@ int main(int argc, char **argv)
 		std::cerr << e.what() << std::endl;
 		return 2;
 	}
+	int i;
+	std::cin >> i;
 
 	return 0;
 }
