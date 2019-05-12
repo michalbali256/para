@@ -32,25 +32,9 @@ private:
 	
 	
 
-	struct neigh_length
-	{
-		neigh_length() : neigh(), length() {}
-		neigh_length(uint32_t neigh, uint32_t length) : neigh(neigh), length(length) {}
-		uint32_t neigh;
-		uint32_t length;
-	};
+	neigh_list * cu_neighbors_;
+	neigh_length * cu_edges_;
 
-	struct neigh_list
-	{
-		neigh_list(neigh_length * neigh, uint32_t count) : neigh(neigh), count(count) {}
-		neigh_length * neigh = nullptr;
-		uint32_t count;
-	};
-
-	std::vector<neigh_list> neighbors_;
-	std::vector<neigh_length> edges_;
-	std::vector<point_t> points1;
-	std::vector<point_t> points2;
 public:
 	virtual void initialize(index_t points, const std::vector<edge_t>& edges, const std::vector<length_t>& lengths, index_t iterations)
 	{
@@ -63,42 +47,48 @@ public:
 		mVelocities.resize(points);
 		
 
-		std::vector<std::vector<neigh_length>> neigh_list;
-		neigh_list.resize(points);
+		std::vector<std::vector<neigh_length>> neigh_lists;
+		neigh_lists.resize(points);
 
 		for (size_t i = 0; i < edges.size(); ++i)
 		{
-			neigh_list[edges[i].p1].push_back({ edges[i].p2, lengths[i] });
-			neigh_list[edges[i].p2].push_back({ edges[i].p1, lengths[i] });
+			neigh_lists[edges[i].p1].push_back({ edges[i].p2, lengths[i] });
+			neigh_lists[edges[i].p2].push_back({ edges[i].p1, lengths[i] });
 		}
-		edges_.resize(edges.size() * 2);
+
+		std::vector<neigh_list> neighbors;
+		std::vector<neigh_length> n_edges;
+
+		n_edges.resize(edges.size() * 2);
 
 		size_t ind = 0;
-		for (size_t i = 0; i < neigh_list.size(); ++i)
+		for (size_t i = 0; i < neigh_lists.size(); ++i)
 		{
-			neighbors_.emplace_back(&edges_[ind], neigh_list[i].size());
-			for (size_t j = 0; j < neigh_list[i].size(); ++j)
+			neighbors.emplace_back(&n_edges[ind], neigh_lists[i].size());
+			for (size_t j = 0; j < neigh_lists[i].size(); ++j)
 			{
-				edges_[ind++] = neigh_list[i][j];
+				n_edges[ind++] = neigh_lists[i][j];
 			}
 		}
 
 		first = true;
-		points1.resize(points);
-		points2.resize(points);
 
-		/*CUCH(cudaSetDevice(0));
-		CUCH(cudaMalloc((void**)& cu_data, count * sizeof(T)));
-		CUCH(cudaMalloc((void**)& cu_res, count * sizeof(T)));
-		bpp::Stopwatch cuda_swatch(true);
+		CUCH(cudaSetDevice(0));
+		CUCH(cudaMalloc((void**)& cu_in_points, points * sizeof(point_t)));
+		CUCH(cudaMalloc((void**)& cu_out_points, points * sizeof(point_t)));
+		CUCH(cudaMalloc((void**)& cu_neighbors_, neighbors.size() * sizeof(neigh_list)));
+		CUCH(cudaMalloc((void**)& cu_edges_, n_edges.size() * sizeof(neigh_length)));
 
-		CUCH(cudaMemcpy(cu_data, src.getRawData(), count * sizeof(T), cudaMemcpyHostToDevice));*/
+		CUCH(cudaMemcpy(cu_neighbors_, neighbors.data(), neighbors.size() * sizeof(neigh_list), cudaMemcpyHostToDevice));
+		CUCH(cudaMemcpy(cu_edges_, n_edges.data(), n_edges.size() * sizeof(neigh_length), cudaMemcpyHostToDevice));
+
+
 	}
 
 	real_t velocity_update_fact = this->mParams.timeQuantum / this->mParams.vertexMass;	// v = Ft/m  => t/m is mul factor for F.
 	bool first = true;
-	point_t* in_points;
-	point_t* out_points;
+	point_t* cu_in_points;
+	point_t* cu_out_points;
 
 	virtual void iteration(std::vector<point_t>& points)
 	{
@@ -109,36 +99,18 @@ public:
 		if (first)
 		{
 			first = false;
-			points2 = points;
-			in_points = points1.data();
-			out_points = points2.data();
+			
+			CUCH(cudaMemcpy(cu_out_points, points.data(), points.size() * sizeof(point_t), cudaMemcpyHostToDevice));
 		}
-		std::swap(out_points, in_points);
+		std::swap(cu_out_points, cu_in_points);
 		
 		
 		for (index_t i = 0; i < points.size(); ++i)
 		{
-			point_t force(0.0,0.0);
-
-			for (index_t j = 0; j < points.size(); ++j)
-				addRepulsiveForce(in_points, i, j, force);
-
-			for (size_t j = 0; j < neighbors_[i].count; ++j)
-				addCompulsiveForce(in_points, i, neighbors_[i].neigh[j].neigh, neighbors_[i].neigh[j].length, force);
 			
-			double vel_x = (mVelocities[i].x + (real_t)force.x * velocity_update_fact) * this->mParams.slowdown;
-			double vel_y = (mVelocities[i].y + (real_t)force.y * velocity_update_fact) * this->mParams.slowdown;
-			mVelocities[i].x = vel_x;
-			mVelocities[i].y = vel_y;
-				
-			out_points[i].x = in_points[i].x + vel_x * this->mParams.timeQuantum;
-			out_points[i].y = in_points[i].y + vel_y * this->mParams.timeQuantum;
 		}
 
-		if (out_points == points1.data())
-			points = points1;
-		else
-			points = points2;
+		CUCH(cudaMemcpy(points.data(), cu_out_points, points.size() * sizeof(point_t), cudaMemcpyDeviceToHost));
 		
 	}
 

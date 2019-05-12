@@ -7,6 +7,9 @@
 #include <cstdint>
 
 #ifndef _MSC_VER
+
+#include <cuda_runtime.h>
+
 using cudaError_t = int;
 #define cudaSuccess 0
 /**
@@ -62,6 +65,22 @@ inline void _cuda_check(cudaError_t status, int line, const char *srcFile, const
  * Macro wrapper for CUDA calls checking.
  */
 
+
+
+struct neigh_length
+{
+	neigh_length() : neigh(), length() {}
+	neigh_length(uint32_t neigh, uint32_t length) : neigh(neigh), length(length) {}
+	uint32_t neigh;
+	uint32_t length;
+};
+
+struct neigh_list
+{
+	neigh_list(neigh_length* neigh, uint32_t count) : neigh(neigh), count(count) {}
+	neigh_length* neigh = nullptr;
+	uint32_t count;
+};
 
 
 
